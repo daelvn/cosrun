@@ -5,7 +5,7 @@ if not mounter then
 end
 for inside, outside in pairs(attachments) do
   -- readonly mode not supported from cosrun
-  mounter.mount(inside, outside, false)
+  if inside ~= "/" then mounter.mount(inside, outside, false) end
 end
 ]]
 
