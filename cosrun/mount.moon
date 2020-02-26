@@ -5,7 +5,9 @@ if not mounter then
 end
 for inside, outside in pairs(attachments) do
   -- readonly mode not supported from cosrun
-  if inside ~= "/" then mounter.mount(inside, outside, false) end
+  if (inside ~= "/") and (inside ~= "/rom") and (inside ~= "bios.lua") then
+    mounter.mount(inside, outside, false)
+  end
 end
 ]]
 

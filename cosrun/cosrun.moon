@@ -109,6 +109,14 @@ with (require "argparse")!
       -- as root?
       with \flag "--root"
         \description "Make this folder the root of the computer"
+
+      -- as rom?
+      with \flag "--rom"
+        \description "Make this folder be mounted as /root"
+
+      -- as bios.lua
+      with \flag "--bios.lua"
+        \description "Make this file be used as bios.lua"
       
       -- local path
       with \argument "path"
@@ -239,7 +247,9 @@ switch @action
           util.arrow "%{bold}#{target}: %{notBold italic}#{path}"
       when "add"
         if config.env
-          @target = "/" if @root
+          @target = "/"        if @root
+          @target = "/rom"     if @rom
+          @target = "bios.lua" if @bios
           util.fatarrow "Attaching %{yellow}#{@path}%{white} as %{green}#{@target}"
           attachments[@target] = util.absolutePath @path
           util.safeWriteAll ".cosrun/#{config.env}/attachments.yml", yaml.dump {attachments}
@@ -249,7 +259,9 @@ switch @action
           util.bangs "Environment is not set. Do `cosrun env set <name>`"
       when "remove"
         if config.env
-          @target = "/" if @root
+          @target = "/"        if @root
+          @target = "/rom"     if @rom
+          @target = "bios.lua" if @bios
           util.fatarrow "Removing attachment for #{@target}"
           attachments[@target] = nil
           util.safeWriteAll ".cosrun/#{config.env}/attachments.yml", yaml.dump {attachments}
@@ -279,10 +291,26 @@ switch @action
       util.safeMakeDir "#{at}/computer"
       util.safeMakeDir "#{at}/computer/#{@id}"
       util.safeCopy root, "#{at}/computer/#{@id}"
+      local rom, bios
+      if attachments["/rom"]
+        rom = attachments["/rom"]
+        util.arrow "Copying /rom to ID #{@id}"
+        util.safeMakeDir "#{at}/internal/"
+        util.safeMakeDir "#{at}/internal/rom/"
+        util.safeCopy    rom, "#{at}/internal/rom/"
+      if attachments["bios.lua"]
+        bios = attachments["bios.lua"]
+        util.arrow "Copying /rom to ID #{@id}"
+        util.safeMakeDir "#{at}/internal/"
+        util.safeCopy    bios, "#{at}/internal/bios.lua"
       -- Run
       util.arrow "Running..."
-      command = "\"#{config.executable}\" --directory '#{util.toWSLPath (util.absolutePath at), config.wsl.prefix}' --script .cosrun/#{config.env}/mount.lua --id #{@id} #{config.flags}"
-      print "   ".. command
+      command = "\"#{config.executable}\"" ..
+                " --directory '#{util.toWSLPath (util.absolutePath at), config.wsl.prefix}'" ..
+                " --script .cosrun/#{config.env}/mount.lua" ..
+                " --id #{@id}" ..
+                ((rom or bios) and " --rom .cosrun/#{config.env}/internal/" or "") ..
+                " #{config.flags}"
       os.execute command
       -- Copy back
       util.arrow "Copying ID #{@id} to root"
@@ -296,9 +324,26 @@ switch @action
       util.safeMakeDir "#{at}/computer"
       util.safeMakeDir "#{at}/computer/#{@id}"
       util.safeCopy root, "#{at}computer/#{@id}"
+      local rom, bios
+      if attachments["/rom"]
+        rom = attachments["/rom"]
+        util.arrow "Copying /rom to ID #{@id}"
+        util.safeMakeDir "#{at}/internal/"
+        util.safeMakeDir "#{at}/internal/rom/"
+        util.safeCopy    rom, "#{at}/internal/rom/"
+      if attachments["bios.lua"]
+        bios = attachments["bios.lua"]
+        util.arrow "Copying /rom to ID #{@id}"
+        util.safeMakeDir "#{at}/internal/"
+        util.safeCopy    bios, "#{at}/internal/bios.lua"
       -- Run
       util.arrow "Running..."
-      command = "\"#{config.executable}\" --directory '#{at}' --script .cosrun/#{config.env}/mount.lua --id #{@id} #{config.flags}"
+      command = "\"#{config.executable}\"" ..
+                " --directory '#{at}'" ..
+                " --script .cosrun/#{config.env}/mount.lua" ..
+                " --id #{@id}" ..
+                ((rom or bios) and " --rom .cosrun/#{config.env}/internal/" or "") ..
+                " #{config.flags}"
       print "   "..command
       os.execute command
       -- Copy back
