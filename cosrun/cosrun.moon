@@ -281,7 +281,7 @@ switch @action
       util.safeCopy root, "#{at}/computer/#{@id}"
       -- Run
       util.arrow "Running..."
-      command = "\"#{config.executable}\" --directory '#{util.toWSLPath (util.absolutePath at), config.wsl.prefix}' --script .cosrun/#{config.env}/mount.lua #{config.flags}"
+      command = "\"#{config.executable}\" --directory '#{util.toWSLPath (util.absolutePath at), config.wsl.prefix}' --script .cosrun/#{config.env}/mount.lua --id #{@id} #{config.flags}"
       print "   ".. command
       os.execute command
       -- Copy back
@@ -298,7 +298,7 @@ switch @action
       util.safeCopy root, "#{at}computer/#{@id}"
       -- Run
       util.arrow "Running..."
-      command = "\"#{config.executable}\" --directory '#{at}' --script .cosrun/#{config.env}/mount.lua #{config.flags}"
+      command = "\"#{config.executable}\" --directory '#{at}' --script .cosrun/#{config.env}/mount.lua --id #{@id} #{config.flags}"
       print "   "..command
       os.execute command
       -- Copy back
