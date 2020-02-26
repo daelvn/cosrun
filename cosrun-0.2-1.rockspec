@@ -1,7 +1,7 @@
 package = "cosrun"
 version = "0.2-1"
 source = {
-  url = "git://github.com/daelvn/ccrunx-compose.git",
+  url = "git://github.com/daelvn/cosrun.git",
   tag = "v0.2"
 }
 description = {
