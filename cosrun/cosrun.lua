@@ -110,6 +110,14 @@ do
         _with_3:description("Make this folder the root of the computer")
       end
       do
+        local _with_3 = _with_2:flag("--rom")
+        _with_3:description("Make this folder be mounted as /root")
+      end
+      do
+        local _with_3 = _with_2:flag("--bios.lua")
+        _with_3:description("Make this file be used as bios.lua")
+      end
+      do
         local _with_3 = _with_2:argument("path")
         _with_3:description("Folder to attach")
       end
@@ -249,6 +257,12 @@ elseif "attach" == _exp_0 then
       if self.root then
         self.target = "/"
       end
+      if self.rom then
+        self.target = "/rom"
+      end
+      if self.bios then
+        self.target = "bios.lua"
+      end
       util.fatarrow("Attaching %{yellow}" .. tostring(self.path) .. "%{white} as %{green}" .. tostring(self.target))
       attachments[self.target] = util.absolutePath(self.path)
       util.safeWriteAll(".cosrun/" .. tostring(config.env) .. "/attachments.yml", yaml.dump({
@@ -263,6 +277,12 @@ elseif "attach" == _exp_0 then
     if config.env then
       if self.root then
         self.target = "/"
+      end
+      if self.rom then
+        self.target = "/rom"
+      end
+      if self.bios then
+        self.target = "bios.lua"
       end
       util.fatarrow("Removing attachment for " .. tostring(self.target))
       attachments[self.target] = nil
@@ -297,9 +317,22 @@ elseif "run" == _exp_0 then
     util.safeMakeDir(tostring(at) .. "/computer")
     util.safeMakeDir(tostring(at) .. "/computer/" .. tostring(self.id))
     util.safeCopy(root, tostring(at) .. "/computer/" .. tostring(self.id))
+    local rom, bios
+    if attachments["/rom"] then
+      rom = attachments["/rom"]
+      util.arrow("Copying /rom to ID " .. tostring(self.id))
+      util.safeMakeDir(tostring(at) .. "/internal/")
+      util.safeMakeDir(tostring(at) .. "/internal/rom/")
+      util.safeCopy(rom, tostring(at) .. "/internal/rom/")
+    end
+    if attachments["bios.lua"] then
+      bios = attachments["bios.lua"]
+      util.arrow("Copying /rom to ID " .. tostring(self.id))
+      util.safeMakeDir(tostring(at) .. "/internal/")
+      util.safeCopy(bios, tostring(at) .. "/internal/bios.lua")
+    end
     util.arrow("Running...")
-    local command = "\"" .. tostring(config.executable) .. "\" --directory '" .. tostring(util.toWSLPath((util.absolutePath(at)), config.wsl.prefix)) .. "' --script .cosrun/" .. tostring(config.env) .. "/mount.lua --id " .. tostring(self.id) .. " " .. tostring(config.flags)
-    print("   " .. command)
+    local command = "\"" .. tostring(config.executable) .. "\"" .. " --directory '" .. tostring(util.toWSLPath((util.absolutePath(at)), config.wsl.prefix)) .. "'" .. " --script .cosrun/" .. tostring(config.env) .. "/mount.lua" .. " --id " .. tostring(self.id) .. ((rom or bios) and " --rom .cosrun/" .. tostring(config.env) .. "/internal/" or "") .. " " .. tostring(config.flags)
     os.execute(command)
     util.arrow("Copying ID " .. tostring(self.id) .. " to root")
     util.safeCopy(tostring(at) .. "/computer/" .. tostring(self.id), root)
@@ -311,8 +344,22 @@ elseif "run" == _exp_0 then
     util.safeMakeDir(tostring(at) .. "/computer")
     util.safeMakeDir(tostring(at) .. "/computer/" .. tostring(self.id))
     util.safeCopy(root, tostring(at) .. "computer/" .. tostring(self.id))
+    local rom, bios
+    if attachments["/rom"] then
+      rom = attachments["/rom"]
+      util.arrow("Copying /rom to ID " .. tostring(self.id))
+      util.safeMakeDir(tostring(at) .. "/internal/")
+      util.safeMakeDir(tostring(at) .. "/internal/rom/")
+      util.safeCopy(rom, tostring(at) .. "/internal/rom/")
+    end
+    if attachments["bios.lua"] then
+      bios = attachments["bios.lua"]
+      util.arrow("Copying /rom to ID " .. tostring(self.id))
+      util.safeMakeDir(tostring(at) .. "/internal/")
+      util.safeCopy(bios, tostring(at) .. "/internal/bios.lua")
+    end
     util.arrow("Running...")
-    local command = "\"" .. tostring(config.executable) .. "\" --directory '" .. tostring(at) .. "' --script .cosrun/" .. tostring(config.env) .. "/mount.lua --id " .. tostring(self.id) .. " " .. tostring(config.flags)
+    local command = "\"" .. tostring(config.executable) .. "\"" .. " --directory '" .. tostring(at) .. "'" .. " --script .cosrun/" .. tostring(config.env) .. "/mount.lua" .. " --id " .. tostring(self.id) .. ((rom or bios) and " --rom .cosrun/" .. tostring(config.env) .. "/internal/" or "") .. " " .. tostring(config.flags)
     print("   " .. command)
     os.execute(command)
     util.arrow("Copying ID " .. tostring(self.id) .. " to root")
