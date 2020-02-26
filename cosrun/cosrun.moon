@@ -6,6 +6,8 @@ yaml    = require "lyaml"
 util    = require "cosrun.util"
 mount   = require "cosrun.mount"
 
+VERSION = "0.2.1"
+
 purge = (t) ->
   unwanted = {
     "environment"
@@ -34,7 +36,7 @@ with (require "argparse")!
   with \flag "-v --version"
     \description "Prints the COSRun version"
     \action      ->
-      print "cosrun 0.1"
+      print "cosrun #{VERSION}"
       os.exit!
 
   -- config reader
@@ -175,7 +177,7 @@ config.flags or= ""
 loadAttachments = (env) -> (yaml.load (util.safeReadAll ".cosrun/#{env}/attachments.yml") or "") or {}
 
 -- main program
-util.header "cosrun 0.1"
+util.header "cosrun #{VERSION}"
 @ = args
 
 errorEnv = ->

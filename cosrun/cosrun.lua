@@ -1,6 +1,7 @@
 local yaml = require("lyaml")
 local util = require("cosrun.util")
 local mount = require("cosrun.mount")
+local VERSION = "0.2.1"
 local purge
 purge = function(t)
   local unwanted = {
@@ -32,7 +33,7 @@ do
     local _with_1 = _with_0:flag("-v --version")
     _with_1:description("Prints the COSRun version")
     _with_1:action(function()
-      print("cosrun 0.1")
+      print("cosrun " .. tostring(VERSION))
       return os.exit()
     end)
   end
@@ -175,7 +176,7 @@ local loadAttachments
 loadAttachments = function(env)
   return (yaml.load((util.safeReadAll(".cosrun/" .. tostring(env) .. "/attachments.yml")) or "")) or { }
 end
-util.header("cosrun 0.1")
+util.header("cosrun " .. tostring(VERSION))
 local self = args
 local errorEnv
 errorEnv = function()
