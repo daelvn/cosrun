@@ -115,7 +115,7 @@ with (require "argparse")!
         \description "Make this folder be mounted as /root"
 
       -- as bios.lua
-      with \flag "--bios.lua"
+      with \flag "--bios"
         \description "Make this file be used as bios.lua"
       
       -- local path
@@ -171,184 +171,172 @@ util.safeMakeDir ".cosrun"
 config         = (yaml.load (util.safeReadAll (args.config or "cosrun.yml")) or "") or {}
 config.flags or= ""
 
--- read attachments
-local attachments
-if config.env
-  attachments = (yaml.load (util.safeReadAll ".cosrun/#{config.env}/attachments.yml") or "") or {}
-else
-  attachments = {}
+-- attachment loading function
+loadAttachments = (env) -> (yaml.load (util.safeReadAll ".cosrun/#{env}/attachments.yml") or "") or {}
 
 -- main program
 util.header "cosrun 0.1"
 @ = args
+
+errorEnv = ->
+  unless config.env
+    util.bangs "Environment is not set. Do `cosrun env set <name>`"
+    os.exit!
+
+packImage = ->
+  util.fatarrow       "Generating image for #{@env} at #{@output}"
+  image             = {}
+  atl               = loadAttachments @env
+  image.attachments = atl
+  image.name        = @env
+  image.mountfile   = util.safeReadAll ".cosrun/#{@env}/mount.lua"
+  util.safeWriteAll @output, yaml.dump {image}
+
+unpackImage = ->
+  util.fatarrow       "Unpacking image: %{yellow}#{@img}"
+  image = (yaml.load (util.safeReadAll @img) or "") or {}
+  util.arrow          "Image name: %{green}#{image.name}"
+  util.safeReplaceDir ".cosrun/"..image.name
+  for inside, outside in pairs image.attachments do util.arrow "Attachment: %{green}#{inside}%{white} -> %{yellow}#{outside}"
+  util.safeWriteAll   ".cosrun/#{image.name}/attachments.yml", yaml.dump {image.attachments}
+  util.safeWriteAll   ".cosrun/#{image.name}/mount.lua",       image.mountfile
+
+newEnv = ->
+  util.fatarrow       "Creating new environment: %{green}#{@name}"
+  util.safeReplaceDir ".cosrun/"..@name
+
+deleteEnv = ->
+  util.fatarrow       "Deleting environment: %{red}#{@name}"
+  util.safeRemove     ".cosrun/"..@name
+
+renameEnv = ->
+  util.fatarrow       "Renaming environment: %{red}#{@name}%{white} -> %{green}#{@newname}"
+  util.safeMove       ".cosrun/"..@name, ".cosrun/"..@newname
+
+setEnv = ->
+  util.fatarrow       "Using environment: %{yellow}#{@name}"
+  config.env          = @name
+
+clean = (env, prefix) ->
+  errorEnv!
+  if (not @all) and (not prefix)
+    util.bangs "ID needed to clear files"
+    os.exit!
+  util.fatarrow    "Clearing all files in .cosrun/#{env}/computer/#{prefix}"
+  util.safeRemove  ".cosrun/#{env}/computer/#{prefix}"
+  util.safeMakeDir ".cosrun/#{env}/computer/#{prefix}"
+
+regenMount = ->
+  errorEnv!
+  util.arrow "Creating mount.lua..."
+  mount.createMountfile config.env, loadAttachments config.env
+
+seeAttaches = ->
+  util.fatarrow "Showing attachments:"
+  for target, path in pairs loadAttachments config.env
+      util.arrow "%{bold}#{target}: %{notBold italic}#{path}"
+
+addAttach = ->
+  attachments = loadAttachments config.env
+  errorEnv!
+  @target = "/"        if @root
+  @target = "/rom"     if @rom
+  @target = "bios.lua" if @bios
+  util.fatarrow "Attaching %{yellow}#{@path}%{white} as %{green}#{@target}"
+  attachments[@target] = util.absolutePath @path
+  util.safeWriteAll ".cosrun/#{config.env}/attachments.yml", yaml.dump {attachments}
+  util.arrow "Creating mount.lua..."
+  mount.createMountfile config.env, attachments
+
+removeAttach = ->
+  attachments = loadAttachments config.env
+  errorEnv!
+  @target = "/"        if @root
+  @target = "/rom"     if @rom
+  @target = "bios.lua" if @bios
+  util.fatarrow "Removing attachment for #{@target}"
+  attachments[@target] = nil
+  util.safeWriteAll ".cosrun/#{config.env}/attachments.yml", yaml.dump {attachments}
+  util.arrow "Creating mount.lua..."
+  mount.createMountfile config.env, attachments
+
+subrun = (wsl) ->
+  attachments = loadAttachments config.env
+  at          = ".cosrun/#{@env}"
+  root        = attachments['/']
+  -- Copy
+  util.arrow "Copying root to ID #{@id}"
+  util.safeMakeDir root
+  util.safeMakeDir "#{at}/computer"
+  util.safeMakeDir "#{at}/computer/#{@id}"
+  util.safeCopy root, "#{at}/computer/#{@id}"
+  local rom, bios
+  if attachments["/rom"]
+    rom = attachments["/rom"]
+    util.arrow "Copying /rom to ID #{@id}"
+    util.safeMakeDir "#{at}/internal/"
+    util.safeMakeDir "#{at}/internal/rom/"
+    util.safeCopy    rom, "#{at}/internal/rom/"
+  if attachments["bios.lua"]
+    bios = attachments["bios.lua"]
+    util.arrow "Copying bios.lua to ID #{@id}"
+    util.safeMakeDir "#{at}/internal/"
+    util.safeCopy    bios, "#{at}/internal/bios.lua"
+  -- Run
+  util.arrow "Running..."
+  command = "\"#{config.executable}\"" ..
+            (wsl and " --directory '#{util.toWSLPath (util.absolutePath at), config.wsl.prefix}'" or " --directory '#{at}'") ..
+            " --script .cosrun/#{@env}/mount.lua" ..
+            " --id #{@id}" ..
+            ((rom or bios) and " --rom .cosrun/#{@env}/internal/" or "") ..
+            " #{config.flags}"
+  --print "   " .. command
+  os.execute command
+  -- Copy back
+  util.arrow "Copying ID #{@id} to root"
+  util.safeCopy "#{at}/computer/#{@id}", root
+
+run = ->
+  unless config.executable
+    util.bangs "Missing path for CraftOS-PC executable"
+    os.exit!
+  -- Setenv
+  util.arrow "Setting environment to #{@env}"
+  config.env = @env
+  -- Clean
+  clean @env, @id
+  -- Attachments
+  attachments = loadAttachments config.env
+  unless attachments["/"]
+    util.bangs "No / attachment. Set with `cosrun attach add <folder> --root`"
+    os.exit!
+  -- run
+  util.fatarrow "Running CraftOS-PC with environment %{green}#{@env}"
+  subrun config.wsl.use
+
 switch @action
-  -- image
   when "image"
     switch @image_action
-      when "pack"
-        util.fatarrow       "Generating image for #{@env} at #{@output}"
-        image             = {}
-        atl               = (yaml.load (util.safeReadAll ".cosrun/#{@env}/attachments.yml") or "") or {}
-        image.attachments = atl
-        image.name        = @env
-        image.mountfile   = util.safeReadAll ".cosrun/#{@env}/mount.lua"
-        util.safeWriteAll @output, yaml.dump {image}
-      when "unpack"
-        util.fatarrow       "Unpacking image: %{yellow}#{@img}"
-        image = (yaml.load (util.safeReadAll @img) or "") or {}
-        util.arrow          "Image name: %{green}#{image.name}"
-        util.safeReplaceDir ".cosrun/"..image.name
-        for inside, outside in pairs image.attachments do util.arrow "Attachment: %{green}#{inside}%{white} -> %{yellow}#{outside}"
-        util.safeWriteAll   ".cosrun/#{image.name}/attachments.yml", yaml.dump {image.attachments}
-        util.safeWriteAll   ".cosrun/#{image.name}/mount.lua",       image.mountfile
-  -- environment
+      when "pack"   then packImage!
+      when "unpack" then unpackImage!
+  
   when "environment"    
     switch @env_action
-      when "new"
-        util.fatarrow       "Creating new environment: %{green}#{@name}"
-        util.safeReplaceDir ".cosrun/"..@name
-      when "delete"
-        util.fatarrow       "Deleting environment: %{red}#{@name}"
-        util.safeRemove     ".cosrun/"..@name
-      when "rename"
-        util.fatarrow       "Renaming environment: %{red}#{@name}%{white} -> %{green}#{@newname}"
-        util.safeMove       ".cosrun/"..@name, ".cosrun/"..@newname
-      when "set"
-        util.fatarrow       "Using environment: %{yellow}#{@name}"
-        config.env          = @name
-  -- clean
-  when "clean"
-    unless config.env
-      util.bangs "Environment is not set. Do `cosrun env set <name>`"
-      os.exit!
-    if @all
-      util.fatarrow    "Clearing all files in .cosrun/#{config.env}/computer/"
-      util.safeRemove  ".cosrun/#{config.env}/computer/"
-      util.safeMakeDir ".cosrun/#{config.env}/computer/"
-    else
-      unless @id
-        util.bangs "ID needed to clear files"
-        os.exit!
-      util.fatarrow    "Clearing all files in .cosrun/#{config.env}/computer/#{@id}"
-      util.safeRemove  ".cosrun/#{config.env}/computer/#{@id}"
-      util.safeMakeDir ".cosrun/#{config.env}/computer/#{@id}"
-  -- attach
+      when "new"    then newEnv!
+      when "delete" then deleteEnv!   
+      when "rename" then renameEnv!
+      when "set"    then setEnv!
+
+  when "clean" then clean config.env, @id
+
   when "attach"
     switch @attach_action
-      when "regenerate"
-        unless config.env
-          util.bangs "Environment is not set. Do `cosrun env set <name>`"
-          os.exit!
-        util.arrow "Creating mount.lua..."
-        mount.createMountfile config.env, attachments
-      when "see"
-        util.fatarrow "Showing attachments:"
-        for target, path in pairs attachments
-          util.arrow "%{bold}#{target}: %{notBold italic}#{path}"
-      when "add"
-        if config.env
-          @target = "/"        if @root
-          @target = "/rom"     if @rom
-          @target = "bios.lua" if @bios
-          util.fatarrow "Attaching %{yellow}#{@path}%{white} as %{green}#{@target}"
-          attachments[@target] = util.absolutePath @path
-          util.safeWriteAll ".cosrun/#{config.env}/attachments.yml", yaml.dump {attachments}
-          util.arrow "Creating mount.lua..."
-          mount.createMountfile config.env, attachments
-        else
-          util.bangs "Environment is not set. Do `cosrun env set <name>`"
-      when "remove"
-        if config.env
-          @target = "/"        if @root
-          @target = "/rom"     if @rom
-          @target = "bios.lua" if @bios
-          util.fatarrow "Removing attachment for #{@target}"
-          attachments[@target] = nil
-          util.safeWriteAll ".cosrun/#{config.env}/attachments.yml", yaml.dump {attachments}
-          util.arrow "Creating mount.lua..."
-          mount.createMountfile config.env, attachments
-        else
-          util.bangs "Environment is not set. Do `cosrun env set <name>`"
-  when "run"
-    unless config.executable
-      util.bangs "Missing path for CraftOS-PC executable"
-      os.exit!
-    unless config.env
-      util.bangs "Environment is not set. Do `cosrun env set <name>`"
-      os.exit!
-    -- find / attachment
-    unless attachments["/"]
-      util.bangs "No / attachment. Set with `cosrun attach add <folder> --root`"
-      os.exit!
-    -- run
-    util.fatarrow "Running CraftOS-PC with environment %{green}#{config.env}"
-    if config.wsl.use
-      at   = ".cosrun/#{config.env}"
-      root = attachments['/']
-      -- Copy
-      util.arrow "Copying root to ID #{@id}"
-      util.safeMakeDir root
-      util.safeMakeDir "#{at}/computer"
-      util.safeMakeDir "#{at}/computer/#{@id}"
-      util.safeCopy root, "#{at}/computer/#{@id}"
-      local rom, bios
-      if attachments["/rom"]
-        rom = attachments["/rom"]
-        util.arrow "Copying /rom to ID #{@id}"
-        util.safeMakeDir "#{at}/internal/"
-        util.safeMakeDir "#{at}/internal/rom/"
-        util.safeCopy    rom, "#{at}/internal/rom/"
-      if attachments["bios.lua"]
-        bios = attachments["bios.lua"]
-        util.arrow "Copying /rom to ID #{@id}"
-        util.safeMakeDir "#{at}/internal/"
-        util.safeCopy    bios, "#{at}/internal/bios.lua"
-      -- Run
-      util.arrow "Running..."
-      command = "\"#{config.executable}\"" ..
-                " --directory '#{util.toWSLPath (util.absolutePath at), config.wsl.prefix}'" ..
-                " --script .cosrun/#{config.env}/mount.lua" ..
-                " --id #{@id}" ..
-                ((rom or bios) and " --rom .cosrun/#{config.env}/internal/" or "") ..
-                " #{config.flags}"
-      os.execute command
-      -- Copy back
-      util.arrow "Copying ID #{@id} to root"
-      util.safeCopy "#{at}/computer/#{@id}", root
-    else
-      at   = util.absolutePath ".cosrun/#{config.env}/"
-      root = attachments['/']
-      -- Copy
-      util.arrow "Copying root to ID #{@id}"
-      util.safeMakeDir root
-      util.safeMakeDir "#{at}/computer"
-      util.safeMakeDir "#{at}/computer/#{@id}"
-      util.safeCopy root, "#{at}computer/#{@id}"
-      local rom, bios
-      if attachments["/rom"]
-        rom = attachments["/rom"]
-        util.arrow "Copying /rom to ID #{@id}"
-        util.safeMakeDir "#{at}/internal/"
-        util.safeMakeDir "#{at}/internal/rom/"
-        util.safeCopy    rom, "#{at}/internal/rom/"
-      if attachments["bios.lua"]
-        bios = attachments["bios.lua"]
-        util.arrow "Copying /rom to ID #{@id}"
-        util.safeMakeDir "#{at}/internal/"
-        util.safeCopy    bios, "#{at}/internal/bios.lua"
-      -- Run
-      util.arrow "Running..."
-      command = "\"#{config.executable}\"" ..
-                " --directory '#{at}'" ..
-                " --script .cosrun/#{config.env}/mount.lua" ..
-                " --id #{@id}" ..
-                ((rom or bios) and " --rom .cosrun/#{config.env}/internal/" or "") ..
-                " #{config.flags}"
-      print "   "..command
-      os.execute command
-      -- Copy back
-      util.arrow "Copying ID #{@id} to root"
-      util.safeCopy "#{at}/computer/#{@id}", root
+      when "regenerate" then regenMount!
+      when "see"        then seeAttaches!    
+      when "add"        then addAttach!
+      when "remove"     then removeAttach!
+  
+  when "run" then run!
 
 -- rewrite config
 util.safeWriteAll "cosrun.yml", yaml.dump {config}

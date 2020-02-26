@@ -1,8 +1,8 @@
 ---
-env: test
+env: a
+wsl:
+  prefix: \\wsl$\Alpine\
+  use: true
 flags: ''
 executable: /mnt/c/Program Files/CraftOS-PC/CraftOS-PC.exe
-wsl:
-  use: true
-  prefix: \\wsl$\Alpine\
 ...
