@@ -268,7 +268,7 @@ addAttach = function()
     self.target = "bios.lua"
   end
   util.fatarrow("Attaching %{yellow}" .. tostring(self.path) .. "%{white} as %{green}" .. tostring(self.target))
-  attachments[self.target] = util.absolutePath(self.path)
+  attachments[self.target] = self.path
   util.safeWriteAll(".cosrun/" .. tostring(config.env) .. "/attachments.yml", yaml.dump({
     attachments
   }))

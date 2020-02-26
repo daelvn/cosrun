@@ -243,7 +243,8 @@ addAttach = ->
   @target = "/rom"     if @rom
   @target = "bios.lua" if @bios
   util.fatarrow "Attaching %{yellow}#{@path}%{white} as %{green}#{@target}"
-  attachments[@target] = util.absolutePath @path
+  --attachments[@target] = util.absolutePath @path
+  attachments[@target] = @path
   util.safeWriteAll ".cosrun/#{config.env}/attachments.yml", yaml.dump {attachments}
   util.arrow "Creating mount.lua..."
   mount.createMountfile config.env, attachments
