@@ -7,7 +7,7 @@ fs      = require "filekit"
 util    = require "cosrun.util"
 mount   = require "cosrun.mount"
 
-VERSION = "0.3"
+VERSION = "0.4"
 
 purge = (t) ->
   unwanted = {
@@ -91,6 +91,9 @@ with (require "argparse")!
     
     with \flag "-a --all"
       \description "cleans all environments"
+
+    with \flag "-i --imports"
+      \description "only cleans imports in environment"
 
   -- attach folders
   with \command "attach a"
@@ -177,6 +180,9 @@ with (require "argparse")!
         \convert     tonumber
         \default     0
 
+      with \option "-d --dir"
+        \description "Changes the root directory for the import"
+
   args = purge \parse!
 
 -- make .cosrun
@@ -227,6 +233,8 @@ importImage = ->
   util.safeMakeDir "#{at}/computer"
   util.safeMakeDir "#{at}/computer/#{@id}"
   for inside, outside in pairs image.attachments
+    if @dir
+      outside = fs.combine @dir, outside
     util.arrow     "Importing %{yellow}#{outside}%{white} -> %{green}#{inside}"
     switch inside
       when "bios.lua"
@@ -261,13 +269,17 @@ setEnv = ->
 
 clean = (env, prefix) ->
   errorEnv!
-  if (not @all) and (not prefix)
+  if (not (@all or @imports)) and (not prefix)
     util.bangs "ID needed to remove files"
     os.exit!
   if @all
-    util.fatarrow  "Cleaning all files in .cosrun/#{env}/"
+    util.fatarrow    "Cleaning all files in .cosrun/#{env}/"
     util.safeRemove  ".cosrun/#{env}/"
     util.safeMakeDir ".cosrun/#{env}/"
+  elseif @imports
+    util.fatarrow    "Cleaning all imports in .cosrun/#{env}/"
+    util.safeRemove  ".cosrun/#{env}/import/"
+    util.safeMakeDir ".cosrun/#{env}/import/"
   else
     util.fatarrow    "Cleaning all files in .cosrun/#{env}/computer/#{prefix}"
     util.safeRemove  ".cosrun/#{env}/computer/#{prefix}"

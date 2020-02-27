@@ -1,8 +1,8 @@
 package = "cosrun"
-version = "0.3-1"
+version = "0.4-1"
 source = {
   url = "git://github.com/daelvn/cosrun.git",
-  tag = "v0.3"
+  tag = "v0.4"
 }
 description = {
   summary = "Run projects easily with CraftOS-PC 2",

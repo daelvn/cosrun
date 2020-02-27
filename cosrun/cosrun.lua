@@ -91,6 +91,10 @@ do
       local _with_2 = _with_1:flag("-a --all")
       _with_2:description("cleans all environments")
     end
+    do
+      local _with_2 = _with_1:flag("-i --imports")
+      _with_2:description("only cleans imports in environment")
+    end
   end
   do
     local _with_1 = _with_0:command("attach a")
@@ -180,6 +184,10 @@ do
         _with_3:convert(tonumber)
         _with_3:default(0)
       end
+      do
+        local _with_3 = _with_2:option("-d --dir")
+        _with_3:description("Changes the root directory for the import")
+      end
     end
   end
   args = purge(_with_0:parse())
@@ -238,6 +246,9 @@ importImage = function()
   util.safeMakeDir(tostring(at) .. "/computer")
   util.safeMakeDir(tostring(at) .. "/computer/" .. tostring(self.id))
   for inside, outside in pairs(image.attachments) do
+    if self.dir then
+      outside = fs.combine(self.dir, outside)
+    end
     util.arrow("Importing %{yellow}" .. tostring(outside) .. "%{white} -> %{green}" .. tostring(inside))
     local _exp_0 = inside
     if "bios.lua" == _exp_0 then
@@ -278,7 +289,7 @@ end
 local clean
 clean = function(env, prefix)
   errorEnv()
-  if (not self.all) and (not prefix) then
+  if (not (self.all or self.imports)) and (not prefix) then
     util.bangs("ID needed to remove files")
     os.exit()
   end
@@ -286,6 +297,10 @@ clean = function(env, prefix)
     util.fatarrow("Cleaning all files in .cosrun/" .. tostring(env) .. "/")
     util.safeRemove(".cosrun/" .. tostring(env) .. "/")
     return util.safeMakeDir(".cosrun/" .. tostring(env) .. "/")
+  elseif self.imports then
+    util.fatarrow("Cleaning all imports in .cosrun/" .. tostring(env) .. "/")
+    util.safeRemove(".cosrun/" .. tostring(env) .. "/import/")
+    return util.safeMakeDir(".cosrun/" .. tostring(env) .. "/import/")
   else
     util.fatarrow("Cleaning all files in .cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))
     util.safeRemove(".cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))

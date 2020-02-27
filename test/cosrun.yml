@@ -1,8 +1,8 @@
 ---
-env: a
 executable: /mnt/c/Program Files/CraftOS-PC/CraftOS-PC.exe
-flags: ''
+env: a
 wsl:
-  use: true
   prefix: \\wsl$\Alpine\
+  use: true
+flags: ''
 ...
