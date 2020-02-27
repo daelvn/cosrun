@@ -64,7 +64,7 @@ safeWriteAll = (path, txt) -> with fs.safeOpen path, "w"
   return true
 
 safeCopy = (fr, to) ->
-  safeRemove to
+  --safeRemove to
   if fs.isDir fr
     safeMakeDir to
     for node in *fs.list fr

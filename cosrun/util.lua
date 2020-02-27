@@ -102,7 +102,6 @@ safeWriteAll = function(path, txt)
 end
 local safeCopy
 safeCopy = function(fr, to)
-  safeRemove(to)
   if fs.isDir(fr) then
     safeMakeDir(to)
     local _list_0 = fs.list(fr)

@@ -55,7 +55,7 @@ Now you can run it with: (ID defaults to 0, change that with `--id` option.)
 $ cosrun run <name>
 ```
 
-When a COSRun project runs, it copies the files from your root path to the computer ID root, and then mounts the rest of folders using CraftOS-PC's `mounter` API. When the computer exits, it copies the files from the computer ID root to your root path again. It isn't recommended that you edit files in your source code while it's running or you could lose changes. Other mounts that aren't root don't need copying because CraftOS-PC works directly in them instead of copying them over.
+When a COSRun project runs, it copies the files from your root path to the computer ID root, and then mounts the rest of folders using CraftOS-PC's `mounter` API. It isn't recommended that you edit files in your source code while it's running or you could lose changes. Other mounts that aren't root don't need copying because CraftOS-PC works directly in them instead of copying them over.
 
 If you want to clear the files *inside* the computer, use `clean`:
 
@@ -77,6 +77,15 @@ Then someone else can clone your repo, unpack the image and run it like this:
 $ git clone you/your-amazing-repo
 $ cosrun image unpack amazing-project.yml
 $ cosrun run amazing-project
+```
+
+### Merging projects
+
+You can use several projects in the same emulator by using `cosrun image import`:
+
+```sh
+$ cosrun image import child.yml 0      # cosrun img import <img> <id>
+$ cosrun run parent
 ```
 
 ## License

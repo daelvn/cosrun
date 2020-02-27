@@ -3,10 +3,11 @@
 -- By daelvn
 --fs      = require "filekit"
 yaml    = require "lyaml"
+fs      = require "filekit"
 util    = require "cosrun.util"
 mount   = require "cosrun.mount"
 
-VERSION = "0.2.1"
+VERSION = "0.3"
 
 purge = (t) ->
   unwanted = {
@@ -157,12 +158,24 @@ with (require "argparse")!
       with \argument "output"
         \description "Output file (YAML format)"
 
-    -- run
+    -- unpack
     with \command "unpack u"
       \description "Unpacks an image"
 
       with \argument "img"
-        \description "Image to run"
+        \description "Image to unpack"
+
+    -- import
+    with \command "import i"
+      \description "Copies files from image into current environment"
+
+      with \argument "img"
+        \description "Image to import"
+
+      with \argument "id"
+        \description "ID to import the files to"
+        \convert     tonumber
+        \default     0
 
   args = purge \parse!
 
@@ -203,6 +216,33 @@ unpackImage = ->
   util.safeWriteAll   ".cosrun/#{image.name}/attachments.yml", yaml.dump {image.attachments}
   util.safeWriteAll   ".cosrun/#{image.name}/mount.lua",       image.mountfile
 
+local addAttach
+importImage = ->
+  errorEnv!
+  at               = ".cosrun/#{config.env}/import"
+  util.safeMakeDir at
+  util.fatarrow    "Importing image: %{yellow}#{@img}"
+  image = (yaml.load (util.safeReadAll @img) or "") or {}
+  util.arrow       "Image name: %{green}#{image.name}"
+  util.safeMakeDir "#{at}/computer"
+  util.safeMakeDir "#{at}/computer/#{@id}"
+  for inside, outside in pairs image.attachments
+    util.arrow     "Importing %{yellow}#{outside}%{white} -> %{green}#{inside}"
+    switch inside
+      when "bios.lua"
+        util.safeMakeDir "#{at}/internal"
+        util.safeCopy    outside, "#{at}/internal/bios.lua"
+      when "/rom"
+        util.safeMakeDir "#{at}/internal"
+        util.safeMakeDir "#{at}/internal/rom"
+        util.safeCopy    outside, "#{at}/internal/rom/"
+      when "/"
+        util.safeCopy outside, "#{at}/computer/#{@id}/"
+      else
+        @path, @target = outside, inside
+        addAttach!
+        --util.safeCopy outside, "#{at}/computer/#{@id}/#{inside}"
+
 newEnv = ->
   util.fatarrow       "Creating new environment: %{green}#{@name}"
   util.safeReplaceDir ".cosrun/"..@name
@@ -222,11 +262,16 @@ setEnv = ->
 clean = (env, prefix) ->
   errorEnv!
   if (not @all) and (not prefix)
-    util.bangs "ID needed to clear files"
+    util.bangs "ID needed to remove files"
     os.exit!
-  util.fatarrow    "Clearing all files in .cosrun/#{env}/computer/#{prefix}"
-  util.safeRemove  ".cosrun/#{env}/computer/#{prefix}"
-  util.safeMakeDir ".cosrun/#{env}/computer/#{prefix}"
+  if @all
+    util.fatarrow  "Cleaning all files in .cosrun/#{env}/"
+    util.safeRemove  ".cosrun/#{env}/"
+    util.safeMakeDir ".cosrun/#{env}/"
+  else
+    util.fatarrow    "Cleaning all files in .cosrun/#{env}/computer/#{prefix}"
+    util.safeRemove  ".cosrun/#{env}/computer/#{prefix}"
+    util.safeMakeDir ".cosrun/#{env}/computer/#{prefix}"
 
 regenMount = ->
   errorEnv!
@@ -267,6 +312,10 @@ subrun = (wsl) ->
   attachments = loadAttachments config.env
   at          = ".cosrun/#{@env}"
   root        = attachments['/']
+  -- Import
+  if fs.exists "#{at}/import"
+    util.arrow "Copying imports..."
+    util.safeCopy "#{at}/import", at
   -- Copy
   util.arrow "Copying root to ID #{@id}"
   util.safeMakeDir root
@@ -296,8 +345,9 @@ subrun = (wsl) ->
   --print "   " .. command
   os.execute command
   -- Copy back
-  util.arrow "Copying ID #{@id} to root"
-  util.safeCopy "#{at}/computer/#{@id}", root
+  -- As of 0.3, root is not copied back anymore
+  --util.arrow "Copying ID #{@id} to root"
+  --util.safeCopy "#{at}/computer/#{@id}", root
 
 run = ->
   unless config.executable
@@ -322,6 +372,7 @@ switch @action
     switch @image_action
       when "pack"   then packImage!
       when "unpack" then unpackImage!
+      when "import" then importImage!
   
   when "environment"    
     switch @env_action
@@ -329,7 +380,7 @@ switch @action
       when "delete" then deleteEnv!   
       when "rename" then renameEnv!
       when "set"    then setEnv!
-
+  
   when "clean" then clean config.env, @id
 
   when "attach"

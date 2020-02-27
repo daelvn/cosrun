@@ -1,7 +1,8 @@
 local yaml = require("lyaml")
+local fs = require("filekit")
 local util = require("cosrun.util")
 local mount = require("cosrun.mount")
-local VERSION = "0.2.1"
+local VERSION = "0.3"
 local purge
 purge = function(t)
   local unwanted = {
@@ -163,7 +164,21 @@ do
       _with_2:description("Unpacks an image")
       do
         local _with_3 = _with_2:argument("img")
-        _with_3:description("Image to run")
+        _with_3:description("Image to unpack")
+      end
+    end
+    do
+      local _with_2 = _with_1:command("import i")
+      _with_2:description("Copies files from image into current environment")
+      do
+        local _with_3 = _with_2:argument("img")
+        _with_3:description("Image to import")
+      end
+      do
+        local _with_3 = _with_2:argument("id")
+        _with_3:description("ID to import the files to")
+        _with_3:convert(tonumber)
+        _with_3:default(0)
       end
     end
   end
@@ -211,6 +226,35 @@ unpackImage = function()
   }))
   return util.safeWriteAll(".cosrun/" .. tostring(image.name) .. "/mount.lua", image.mountfile)
 end
+local addAttach
+local importImage
+importImage = function()
+  errorEnv()
+  local at = ".cosrun/" .. tostring(config.env) .. "/import"
+  util.safeMakeDir(at)
+  util.fatarrow("Importing image: %{yellow}" .. tostring(self.img))
+  local image = (yaml.load((util.safeReadAll(self.img)) or "")) or { }
+  util.arrow("Image name: %{green}" .. tostring(image.name))
+  util.safeMakeDir(tostring(at) .. "/computer")
+  util.safeMakeDir(tostring(at) .. "/computer/" .. tostring(self.id))
+  for inside, outside in pairs(image.attachments) do
+    util.arrow("Importing %{yellow}" .. tostring(outside) .. "%{white} -> %{green}" .. tostring(inside))
+    local _exp_0 = inside
+    if "bios.lua" == _exp_0 then
+      util.safeMakeDir(tostring(at) .. "/internal")
+      util.safeCopy(outside, tostring(at) .. "/internal/bios.lua")
+    elseif "/rom" == _exp_0 then
+      util.safeMakeDir(tostring(at) .. "/internal")
+      util.safeMakeDir(tostring(at) .. "/internal/rom")
+      util.safeCopy(outside, tostring(at) .. "/internal/rom/")
+    elseif "/" == _exp_0 then
+      util.safeCopy(outside, tostring(at) .. "/computer/" .. tostring(self.id) .. "/")
+    else
+      self.path, self.target = outside, inside
+      addAttach()
+    end
+  end
+end
 local newEnv
 newEnv = function()
   util.fatarrow("Creating new environment: %{green}" .. tostring(self.name))
@@ -235,12 +279,18 @@ local clean
 clean = function(env, prefix)
   errorEnv()
   if (not self.all) and (not prefix) then
-    util.bangs("ID needed to clear files")
+    util.bangs("ID needed to remove files")
     os.exit()
   end
-  util.fatarrow("Clearing all files in .cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))
-  util.safeRemove(".cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))
-  return util.safeMakeDir(".cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))
+  if self.all then
+    util.fatarrow("Cleaning all files in .cosrun/" .. tostring(env) .. "/")
+    util.safeRemove(".cosrun/" .. tostring(env) .. "/")
+    return util.safeMakeDir(".cosrun/" .. tostring(env) .. "/")
+  else
+    util.fatarrow("Cleaning all files in .cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))
+    util.safeRemove(".cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))
+    return util.safeMakeDir(".cosrun/" .. tostring(env) .. "/computer/" .. tostring(prefix))
+  end
 end
 local regenMount
 regenMount = function()
@@ -255,7 +305,6 @@ seeAttaches = function()
     util.arrow("%{bold}" .. tostring(target) .. ": %{notBold italic}" .. tostring(path))
   end
 end
-local addAttach
 addAttach = function()
   local attachments = loadAttachments(config.env)
   errorEnv()
@@ -302,6 +351,10 @@ subrun = function(wsl)
   local attachments = loadAttachments(config.env)
   local at = ".cosrun/" .. tostring(self.env)
   local root = attachments['/']
+  if fs.exists(tostring(at) .. "/import") then
+    util.arrow("Copying imports...")
+    util.safeCopy(tostring(at) .. "/import", at)
+  end
   util.arrow("Copying root to ID " .. tostring(self.id))
   util.safeMakeDir(root)
   util.safeMakeDir(tostring(at) .. "/computer")
@@ -323,9 +376,7 @@ subrun = function(wsl)
   end
   util.arrow("Running...")
   local command = "\"" .. tostring(config.executable) .. "\"" .. (wsl and " --directory '" .. tostring(util.toWSLPath((util.absolutePath(at)), config.wsl.prefix)) .. "'" or " --directory '" .. tostring(at) .. "'") .. " --script .cosrun/" .. tostring(self.env) .. "/mount.lua" .. " --id " .. tostring(self.id) .. ((rom or bios) and " --rom .cosrun/" .. tostring(self.env) .. "/internal/" or "") .. " " .. tostring(config.flags)
-  os.execute(command)
-  util.arrow("Copying ID " .. tostring(self.id) .. " to root")
-  return util.safeCopy(tostring(at) .. "/computer/" .. tostring(self.id), root)
+  return os.execute(command)
 end
 local run
 run = function()
@@ -351,6 +402,8 @@ if "image" == _exp_0 then
     packImage()
   elseif "unpack" == _exp_1 then
     unpackImage()
+  elseif "import" == _exp_1 then
+    importImage()
   end
 elseif "environment" == _exp_0 then
   local _exp_1 = self.env_action
@@ -362,9 +415,9 @@ elseif "environment" == _exp_0 then
     renameEnv()
   elseif "set" == _exp_1 then
     setEnv()
-  elseif "clean" == _exp_1 then
-    clean(config.env, self.id)
   end
+elseif "clean" == _exp_0 then
+  clean(config.env, self.id)
 elseif "attach" == _exp_0 then
   local _exp_1 = self.attach_action
   if "regenerate" == _exp_1 then
