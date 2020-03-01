@@ -7,7 +7,7 @@ fs      = require "filekit"
 util    = require "cosrun.util"
 mount   = require "cosrun.mount"
 
-VERSION = "0.4"
+VERSION = "0.4.1"
 
 purge = (t) ->
   unwanted = {
@@ -80,6 +80,10 @@ with (require "argparse")!
     with \option "-i --id"
       \target  "id"
       \default 0
+
+    -- prints running command
+    with \flag "-p --print"
+      \description "Prints the command used to run the computer"
 
   -- clean environment files
   with \command "clean c"
@@ -354,7 +358,7 @@ subrun = (wsl) ->
             " --id #{@id}" ..
             ((rom or bios) and " --rom .cosrun/#{@env}/internal/" or "") ..
             " #{config.flags}"
-  --print "   " .. command
+  print "   " .. command if @print
   os.execute command
   -- Copy back
   -- As of 0.3, root is not copied back anymore

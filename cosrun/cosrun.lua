@@ -2,7 +2,7 @@ local yaml = require("lyaml")
 local fs = require("filekit")
 local util = require("cosrun.util")
 local mount = require("cosrun.mount")
-local VERSION = "0.3"
+local VERSION = "0.4.1"
 local purge
 purge = function(t)
   local unwanted = {
@@ -77,6 +77,10 @@ do
       local _with_2 = _with_1:option("-i --id")
       _with_2:target("id")
       _with_2:default(0)
+    end
+    do
+      local _with_2 = _with_1:flag("-p --print")
+      _with_2:description("Prints the command used to run the computer")
     end
   end
   do
@@ -391,6 +395,9 @@ subrun = function(wsl)
   end
   util.arrow("Running...")
   local command = "\"" .. tostring(config.executable) .. "\"" .. (wsl and " --directory '" .. tostring(util.toWSLPath((util.absolutePath(at)), config.wsl.prefix)) .. "'" or " --directory '" .. tostring(at) .. "'") .. " --script .cosrun/" .. tostring(self.env) .. "/mount.lua" .. " --id " .. tostring(self.id) .. ((rom or bios) and " --rom .cosrun/" .. tostring(self.env) .. "/internal/" or "") .. " " .. tostring(config.flags)
+  if self.print then
+    print("   " .. command)
+  end
   return os.execute(command)
 end
 local run
