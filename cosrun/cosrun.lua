@@ -2,7 +2,7 @@ local yaml = require("lyaml")
 local fs = require("filekit")
 local util = require("cosrun.util")
 local mount = require("cosrun.mount")
-local VERSION = "0.4.1"
+local VERSION = "0.4.2"
 local purge
 purge = function(t)
   local unwanted = {
@@ -81,6 +81,10 @@ do
     do
       local _with_2 = _with_1:flag("-p --print")
       _with_2:description("Prints the command used to run the computer")
+    end
+    do
+      local _with_2 = _with_1:flag("-r --rom")
+      _with_2:description("Uses .cosrun/<env>/internal/ as the ROM folder")
     end
   end
   do
@@ -394,7 +398,7 @@ subrun = function(wsl)
     util.safeCopy(bios, tostring(at) .. "/internal/bios.lua")
   end
   util.arrow("Running...")
-  local command = "\"" .. tostring(config.executable) .. "\"" .. (wsl and " --directory '" .. tostring(util.toWSLPath((util.absolutePath(at)), config.wsl.prefix)) .. "'" or " --directory '" .. tostring(at) .. "'") .. " --script .cosrun/" .. tostring(self.env) .. "/mount.lua" .. " --id " .. tostring(self.id) .. ((rom or bios) and " --rom .cosrun/" .. tostring(self.env) .. "/internal/" or "") .. " " .. tostring(config.flags)
+  local command = "\"" .. tostring(config.executable) .. "\"" .. (wsl and " --directory '" .. tostring(util.toWSLPath((util.absolutePath(at)), config.wsl.prefix)) .. "'" or " --directory '" .. tostring(at) .. "'") .. " --script .cosrun/" .. tostring(self.env) .. "/mount.lua" .. " --id " .. tostring(self.id) .. ((rom or bios or self.rom) and " --rom .cosrun/" .. tostring(self.env) .. "/internal/" or "") .. " " .. tostring(config.flags)
   if self.print then
     print("   " .. command)
   end

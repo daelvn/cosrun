@@ -7,7 +7,7 @@ fs      = require "filekit"
 util    = require "cosrun.util"
 mount   = require "cosrun.mount"
 
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 
 purge = (t) ->
   unwanted = {
@@ -84,6 +84,10 @@ with (require "argparse")!
     -- prints running command
     with \flag "-p --print"
       \description "Prints the command used to run the computer"
+
+    -- uses rom folder
+    with \flag "-r --rom"
+      \description "Uses .cosrun/<env>/internal/ as the ROM folder"
 
   -- clean environment files
   with \command "clean c"
@@ -356,7 +360,7 @@ subrun = (wsl) ->
             (wsl and " --directory '#{util.toWSLPath (util.absolutePath at), config.wsl.prefix}'" or " --directory '#{at}'") ..
             " --script .cosrun/#{@env}/mount.lua" ..
             " --id #{@id}" ..
-            ((rom or bios) and " --rom .cosrun/#{@env}/internal/" or "") ..
+            ((rom or bios or @rom) and " --rom .cosrun/#{@env}/internal/" or "") ..
             " #{config.flags}"
   print "   " .. command if @print
   os.execute command
